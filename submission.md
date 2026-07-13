@@ -33,7 +33,34 @@
 #1
 
 
-#2
+## Issue #2 — Friends Listening Now shows people from yesterday(Can reproduce)
+
+**How I reproduced it:** Checked darius's feed via GET /feed/<id>/listening-now.
+Nova appeared in the results with a listened_at timestamp roughly 3 hours old,
+well past what should count as "listening now."
+
+    curl -s http://127.0.0.1:5000/feed/ecb52e3a-a023-4e74-acdf-bdec901fd31e/listening-now | jq
+    Simone 3:52:15 (Correct)
+    Nove 2:07:15 (Incorrect)
+
+
+**How I found the root cause:** Traced the route to get_friends_listening_now in
+services/feed_service.py. The query logic itself (friend filtering, ordering,
+dedup by most recent event per friend) was correct. The moment I was confident
+I'd found it was spotting RECENT_THRESHOLD = timedelta(hours=24) defined at the
+top of the file — a 24-hour cutoff, not a "listening now" cutoff.
+
+**The root cause:** The cutoff used to decide whether a listening event counts as
+"recent" was set to 24 hours, so anything played within the last day appeared in
+the feed, including songs played the previous night. The comparison and query logic
+were correct; the threshold value itself was wrong for the feature's intent.
+
+**My fix and side-effect check:** Changed RECENT_THRESHOLD to 30 minutes, matching
+the seed data's distinction between "recent" events (10-20 min old) and "older"
+events (2+ hours old). After reseeding and restarting the server, darius's feed
+count dropped from 3 friends (all leaking through under 24h) to 1 (only the friend
+with a genuinely recent event). Confirmed friends with only older events no
+longer appear.
 
 #3
 
@@ -72,14 +99,14 @@ condition directly: a playlist with only 1 song, which would have returned an em
 - Trying to get user ids
 
 ID MAP
-5ef03353-4b3f-4703-b3ac-aa1f6595f894 nova
-a5945dd6-3354-47d9-b673-ad05a68189e4 darius
-bd377f6f-85f2-41f5-b9ab-b61d15db967f simone
-36f22c80-eac1-4bdf-862b-22a85d74f80e kenji
-532892af-07d5-4517-bd0a-6555fc238ba0 aaliya
+62922db6-e5dc-44b8-aae5-9a151c301d35 nova
+ecb52e3a-a023-4e74-acdf-bdec901fd31e darius
+95c2746a-b362-4be7-94b2-a5819bee2cf2 simone
+a29c9ff4-2c22-46ae-98a4-1d906b13f0cf kenji
+d7846890-ff91-4326-ab9c-169e127cafd9 aaliya
 
 
-0677cf83-df52-43b6-b1be-839837f7b603 Friday Energy playlist ID
+ Friday Energy playlist ID
 
 Songs 
-f4ece12b-ba77-4c74-90e8-50debe420c5e Frequencies
+ Frequencies
