@@ -22,7 +22,7 @@ not for generating the fixes themselves.
   this issue.
 
 ## Git Log:
- ![alt text](image.png)
+![alt text](image-1.png)
  
 ## Main files + their roles
 
