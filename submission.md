@@ -30,8 +30,34 @@
 
 
 ## Bugs
-#1
 
+## Issue #1 — My listening streak keeps resetting(Can reproduce)
+
+**How I reproduced it:** Used flask shell to call update_listening_streak directly with
+controlled dates rather than waiting for a real Sunday. Set kenji's last_listened_at to
+a Saturday with a streak of 12, then called the function with a Sunday datetime as "now."
+Before the fix, this reset the streak to 1 instead of incrementing to 13, matching the
+reported behavior exactly.
+
+**How I found the root cause:** Traced record_listening_event in the listening service,
+which calls update_listening_streak with the current UTC datetime. Reading that function,
+the increment condition was `elif days_since_last == 1 and today.weekday() != 6:`. The
+moment I was confident I'd found it was recognizing that weekday() returns 6 for Sunday,
+meaning the condition explicitly blocks the increment path whenever today is a Sunday —
+even when exactly one day had passed, which should always increment.
+
+**The root cause:** The streak-increment branch required both `days_since_last == 1` and
+`today.weekday() != 6`. There is no legitimate reason to treat Sunday differently from any
+other day of the week in this logic. Whenever a user listened on consecutive days and the
+second listen fell on a Sunday, the second condition evaluated to False, so the code fell
+through to the else branch and reset the streak to 1, discarding the existing streak count
+even though the user had listened on consecutive days.
+
+**My fix and side-effect check:** Removed the `and today.weekday() != 6` condition entirely,
+leaving `elif days_since_last == 1: user.listening_streak += 1`. Verified in flask shell that
+a Saturday-to-Sunday consecutive listen now correctly increments 12 to 13. Also tested a
+normal weekday case (Monday-to-Tuesday) to confirm the fix didn't break the standard
+increment path, which correctly went from 5 to 6.
 
 ## Issue #2 — Friends Listening Now shows people from yesterday(Can reproduce)
 
